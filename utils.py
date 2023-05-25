@@ -31,13 +31,19 @@ def get_sensors(folder_dir, labels = None, time_offset=2):
         # open file
         data = pd.read_csv(folder_dir + os.sep + file, header=None)
         data.index = data[0]
+        if len(labels) > 0:
+            data['date'] = data[0].astype('datetime64[ms]') + timedelta(hours=time_offset)
+            data = data.loc[data['date'].between(labels['datetime'].iloc[0], labels['datetime'].iloc[-1])]
         # create table with all sensors
+        else:
+            print('TO DO')
         if all_sensors.empty:
-            all_sensors = data.drop(columns=[0, 1])
-            all_sensors.columns = [filekey + '_' + str(col) for col in data.columns[2:]]
+            all_sensors = data.drop(columns=[0, 1, 'date'])
+            all_sensors.columns = [filekey + '_' + str(col) for col in data.columns if col not in [0, 1, 'date']]
             all_sensors['date'] = data[0].astype('datetime64[ms]') + timedelta(hours=time_offset)
         else:
-            all_sensors[[filekey + '_' + str(col) for col in data.columns[2:]]] = data.drop(columns=[0, 1])
+            all_sensors[[filekey + '_' + str(col) for col in data.columns if col not in [0, 1, 'date']]] = data.drop(columns=[0, 1, 'date'])
+
             # all_sensors['date'] = data[1]
     # if labels, crop all_sensors data to the beginning and ending of labels
     if len(labels) > 0: 
