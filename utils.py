@@ -189,7 +189,7 @@ def get_labels(folder_dir):
     """
     labels_file = pd.read_excel(folder_dir)
     data_labels = pd.DataFrame()
-    time_col = [col for col in labels_file.columns if 'time' in col]
+    time_col = [col for col in labels_file.columns if 'time' in col.lower()]
     assert len(time_col) == 1
     time_col = time_col[0]
 
