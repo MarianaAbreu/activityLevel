@@ -6,7 +6,7 @@ Date: 05/05/2023
 Utility functions for the project related with sensors and tags data.
 """
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import hmmlearn.hmm as hmm
 import numpy as np
@@ -33,6 +33,8 @@ def get_sensors(folder_dir, labels = None, time_offset=2):
         data.index = data[0]
         if len(labels) > 0:
             data['date'] = data[0].astype('datetime64[ms]') + timedelta(hours=time_offset)
+            if 'datetime' not in labels.columns:
+                labels['datetime'] = list(map(lambda x: datetime.combine(data['date'].iloc[0].date(), x), labels['time']))
             data = data.loc[data['date'].between(labels['datetime'].iloc[0], labels['datetime'].iloc[-1])]
         # create table with all sensors
         else:
@@ -49,7 +51,7 @@ def get_sensors(folder_dir, labels = None, time_offset=2):
     if len(labels) > 0: 
         all_sensors = all_sensors.loc[all_sensors['date'].between(labels['datetime'].iloc[0], labels['datetime'].iloc[-1])] 
 
-    return all_sensors
+    return all_sensors, labels
 
 
 def get_sensor_extras(data):
@@ -185,12 +187,42 @@ def get_labels(folder_dir):
     """
     Get labels annotations from excel
     """
+    labels_file = pd.read_excel(folder_dir)
+    data_labels = pd.DataFrame()
+
+    if 'Start time' in labels_file['KM Other']:
+        labels_idx = labels_file.where(labels_file['KM Other'].isin(['Start time', 'End time'])).dropna().index
+        labels_file = labels_file.iloc[list(labels_idx)[0]: list(labels_idx)[1] + 1]
+    else:
+        labels_file = labels_file.loc[labels_file['Real time'].notna()]
+    
+    date1 = datetime.combine(date.today(), labels_file['Real time'].iloc[0])
+    date2 = datetime.combine(date.today(), labels_file['Real time'].iloc[-1])
+    # confirm if the labels annotations respect a resolution of 1s
+    assert (labels_file.iloc[-1].name == int((date2 - date1).total_seconds()))
+
+    for col in labels_file.columns:
+        if 'activity' in col.lower():
+            data_labels['activity'] = labels_file[col]
+        elif 'location' in col.lower():
+            data_labels['location'] = labels_file[col]
+        elif 'level' in col.lower():
+            data_labels['level'] = labels_file[col]
+        elif 'time' in col.lower():
+            data_labels['time'] = labels_file[col]
+
+    return data_labels
+    
+def get_labels_old(folder_dir):
+    """
+    Get labels annotations from excel
+    """
     #labels = utils.get_labels(folder_dir=main_dir + os.sep + 'MCLKM_0304 Annotation file KM.xlsx')
     labels_file = pd.read_excel(folder_dir)
     data_labels = pd.DataFrame()
     # get start and end of acquisition time
-    start = datetime.combine(list(labels_file.columns)[-1], labels_file['Realtime On'].iloc[0])
-    end = datetime.combine(list(labels_file.columns)[-1], labels_file['Realtime Off'].iloc[-1])
+    start = datetime.combine(list(labels_file.columns)[-1], labels_file['Real time'].iloc[0])
+    end = datetime.combine(list(labels_file.columns)[-1], labels_file['Real time'].iloc[-1])
     data_labels['datetime'] = pd.date_range(start, end, freq='1S') 
     data_labels['activity'] = ''
     data_labels['beacon0'] = ''
@@ -260,6 +292,6 @@ def timeline_activities_true(labels, groups):
         for i in range(len(idx_jump)-1):
             start = activity_data.index[idx_jump[i]+1]
             finish = activity_data.index[idx_jump[i+1]]
-            beacon = activity_data[start:finish]['beacon0'].value_counts().idxmax()
+            beacon = activity_data[start:finish]['location'].value_counts().idxmax()
             timeline_df = pd.concat((timeline_df, pd.DataFrame({"Start": start, "Finish": finish, "Activity": group_activity, "Original Activity": activity, "Beacon": beacon}, index=[0])), ignore_index=True) 
     return timeline_df
