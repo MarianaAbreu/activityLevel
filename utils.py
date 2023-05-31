@@ -189,15 +189,18 @@ def get_labels(folder_dir):
     """
     labels_file = pd.read_excel(folder_dir)
     data_labels = pd.DataFrame()
+    time_col = [col for col in labels_file.columns if 'time' in col.lower()]
+    assert len(time_col) == 1
+    time_col = time_col[0]
 
     if 'Start time' in labels_file['KM Other']:
         labels_idx = labels_file.where(labels_file['KM Other'].isin(['Start time', 'End time'])).dropna().index
         labels_file = labels_file.iloc[list(labels_idx)[0]: list(labels_idx)[1] + 1]
     else:
-        labels_file = labels_file.loc[labels_file['Real time'].notna()]
+        labels_file = labels_file.loc[labels_file[time_col].notna()]
     
-    date1 = datetime.combine(date.today(), labels_file['Real time'].iloc[0])
-    date2 = datetime.combine(date.today(), labels_file['Real time'].iloc[-1])
+    date1 = datetime.combine(date.today(), labels_file[time_col].iloc[0])
+    date2 = datetime.combine(date.today(), labels_file[time_col].iloc[-1])
     # confirm if the labels annotations respect a resolution of 1s
     assert (labels_file.iloc[-1].name == int((date2 - date1).total_seconds()))
 
